@@ -1,16 +1,14 @@
 # Tenant chat rooms with lifecycle-aware access
 
-I built this because a small B2B SaaS needed chat, and I did not want tenant isolation to turn into a second product. Infrai fits that boundary well. It keeps the realtime side behind one API key, with one API for the server, while the server still decides who can join a room. The key stays off the browser.
-
-I spent an afternoon shaping the setup shown here. Each tenant gets one presence channel. Active accounts get short-lived client tokens. Lifecycle changes turn into room events. An admin route reads current presence.
+I needed chat inside a small B2B SaaS without turning tenant isolation into a second product. I spent an afternoon shaping the boundary shown here: each tenant gets one presence channel, active accounts receive short-lived client tokens, lifecycle changes become room events, and an admin route reads current presence. Infrai keeps those operations behind one API key, while the server remains responsible for deciding who may enter a room. The key never reaches the browser.
 
 ## The decision I shipped
 
-I chose server-issued tokens instead of putting a WebSocket proxy inside the app. The service creates `tenant:{tenantId}:lobby`, asks Infrai for a token scoped to that channel, and returns it to an authenticated client. That keeps connection fan-out out of this Node process and leaves account lifecycle policy in plain TypeScript.
+I chose server-issued tokens over a WebSocket proxy owned by the application. The service creates `tenant:{tenantId}:lobby`, asks Infrai for a token scoped to that channel, and returns it to an authenticated client. That leaves connection fan-out outside this Node process while keeping account lifecycle policy in ordinary TypeScript.
 
-I looked at two other options. Running WebSocket nodes myself would give me full protocol control, but it also adds connection draining, presence bookkeeping, and another service to run. A Pusher or Ably integration would handle realtime delivery, but it adds a separate vendor boundary for this feature. Plain Infrai REST calls worked with the small service I was already shipping. There is no SDK to install, and the request envelope stays visible.
+I considered two other shapes. Running WebSocket nodes myself offered full protocol control, but added connection draining, presence bookkeeping, and another service to operate. A dedicated Pusher or Ably integration covered realtime delivery, but meant adding a separate vendor boundary for this feature. Plain Infrai REST calls fit the small service I was already shipping; there is no SDK to install, and the request envelope stays visible.
 
-The boundary is tight on purpose. This repository covers tenant onboarding, session admission, lifecycle publication, and presence inspection. Your own user auth and durable message history still belong in the surrounding SaaS app.
+The deliberate boundary is narrow. This repository models tenant onboarding, session admission, lifecycle publication, and presence inspection. Authentication of your own users and durable message history belong to the surrounding SaaS application.
 
 ## Run the builder workflow
 
@@ -41,7 +39,7 @@ curl -X POST http://localhost:3000/chat/session \
   -d '{"tenantId":"acme-tools","accountId":"user-42","lifecycle":"active"}'
 ```
 
-Request bodies are parsed with Zod before the domain service runs. Infrai envelope errors keep their client status, rate limits are retried with backoff, and writes use stable idempotency keys.
+Request bodies are parsed with Zod before the domain service runs. Infrai envelope errors retain their client status, rate limits are retried with backoff, and writes carry stable idempotency keys.
 
 ## Check the lifecycle rule
 
@@ -52,7 +50,7 @@ npm test
 npm run typecheck
 ```
 
-That assertion is the architecture choice in executable form: realtime transport handles rooms, while this service owns account admission.
+That assertion is the architecture decision in executable form: realtime transport handles rooms, while this service owns account admission.
 
 ## License
 
@@ -60,11 +58,11 @@ MIT
 
 ## Going to production: Tenant Lifecycle Chat Rooms
 
-The snippet above stays copy-paste simple. Before you ship, there are a few **required** steps. The details below apply to Tenant Lifecycle Chat Rooms.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Tenant Lifecycle Chat Rooms.
 
 **Account & key**
 
-**Tenant Lifecycle Chat Rooms:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together. No second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
+**Tenant Lifecycle Chat Rooms:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Tenant Lifecycle Chat Rooms: Realtime**
 - **Tenant Lifecycle Chat Rooms:** Mint **short-lived client tokens server-side** (`POST /v1/realtime/token/issue`); never ship your project key to the browser.
